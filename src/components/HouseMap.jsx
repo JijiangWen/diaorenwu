@@ -118,6 +118,33 @@ const ROOMS = [
 // A single room card — used on both mobile carousel and desktop grid
 function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom, isMobile }) {
   const canMove = currentUser && currentUser.status !== room.id;
+  const hasUsers = roomUsers.length > 0;
+
+  // Visual states
+  // 1. Sleep (无人)
+  // 2. Active (有其他人)
+  // 3. Present (自己在此)
+  const roomState = isCurrentUserHere ? 'present' : (hasUsers ? 'active' : 'sleep');
+
+  let borderStyle = '2px solid rgba(255, 255, 255, 0.03)';
+  let bgStyle = 'linear-gradient(135deg, rgba(14, 10, 24, 0.5) 0%, rgba(22, 17, 36, 0.6) 100%)';
+  let shadowStyle = '0 8px 24px rgba(0, 0, 0, 0.5)';
+  let furnitureOpacity = 0.05;
+  let wallLineBg = 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent)';
+
+  if (roomState === 'active') {
+    borderStyle = `2px solid rgba(255, 255, 255, 0.08)`;
+    bgStyle = `linear-gradient(135deg, ${room.ambientLines[0]} 0%, ${room.ambientLines[1]} 100%)`;
+    shadowStyle = `0 0 16px ${room.color}15, 0 8px 24px rgba(0, 0, 0, 0.4)`;
+    furnitureOpacity = 0.22;
+    wallLineBg = `linear-gradient(90deg, transparent, ${room.color}25, transparent)`;
+  } else if (roomState === 'present') {
+    borderStyle = `2px solid ${room.color}`;
+    bgStyle = `linear-gradient(135deg, ${room.ambientLines[0]} 0%, ${room.ambientLines[1]} 100%)`;
+    shadowStyle = `0 0 30px ${room.color}35, 0 8px 30px rgba(0, 0, 0, 0.45)`;
+    furnitureOpacity = 0.38;
+    wallLineBg = `linear-gradient(90deg, transparent, ${room.color}45, transparent)`;
+  }
 
   return (
     <div
@@ -126,37 +153,40 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
         position: 'relative',
         borderRadius: '20px',
         overflow: 'hidden',
-        border: `2px solid ${isCurrentUserHere ? room.color : 'rgba(255,255,255,0.06)'}`,
-        background: `linear-gradient(135deg, ${room.ambientLines[0]} 0%, ${room.ambientLines[1]} 100%)`,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        border: borderStyle,
+        background: bgStyle,
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
         cursor: canMove ? 'pointer' : 'default',
-        transition: 'all 0.3s ease',
-        boxShadow: isCurrentUserHere
-          ? `0 0 24px ${room.color}50, 0 4px 20px rgba(0,0,0,0.4)`
-          : '0 4px 20px rgba(0,0,0,0.3)',
+        transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)',
+        boxShadow: shadowStyle,
         height: isMobile ? '240px' : '220px',
         width: '100%',
       }}
     >
-      {/* Animated ambient background gradient */}
-      <div style={{
-        position: 'absolute', inset: 0, opacity: 0.35,
-        background: isCurrentUserHere
-          ? `radial-gradient(ellipse at 50% 50%, ${room.color}30 0%, transparent 70%)`
-          : 'none',
-        pointerEvents: 'none',
-      }} />
+      {/* Animated ambient background radial glow (Only active when someone is in the room) */}
+      {(roomState !== 'sleep') && (
+        <div style={{
+          position: 'absolute', inset: 0, opacity: roomState === 'present' ? 0.45 : 0.25,
+          background: `radial-gradient(ellipse at 50% 50%, ${room.color}35 0%, transparent 70%)`,
+          pointerEvents: 'none',
+          transition: 'all 0.5s ease',
+        }} />
+      )}
 
-      {/* Room furniture decorations */}
+      {/* Room furniture decorations (Simulated 3D depth and slight tilt) */}
       {room.furniture.map((f, i) => (
         <span key={i} style={{
           position: 'absolute',
           top: f.top, left: f.left,
           fontSize: f.size,
-          opacity: 0.22,
+          opacity: furnitureOpacity,
           pointerEvents: 'none',
           userSelect: 'none',
+          transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)',
+          filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))',
+          transform: 'rotate(-6deg) skewX(2deg) scale(0.95)',
+          display: 'inline-block',
         }}>
           {f.emoji}
         </span>
@@ -165,7 +195,7 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
       {/* "You are here" pulse ring */}
       {isCurrentUserHere && (
         <div style={{
-          position: 'absolute', top: '10px', right: '10px',
+          position: 'absolute', top: '12px', right: '12px',
           width: '10px', height: '10px', borderRadius: '50%',
           backgroundColor: room.color,
           boxShadow: `0 0 0 4px ${room.color}30`,
@@ -179,22 +209,35 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
         padding: '12px 14px',
         display: 'flex', alignItems: 'center', gap: '8px',
       }}>
-        <span style={{ fontSize: '1.5rem' }}>{room.icon}</span>
+        <span style={{ 
+          fontSize: '1.5rem',
+          filter: roomState !== 'sleep' ? 'drop-shadow(0 0 8px currentColor)' : 'none',
+          color: roomState !== 'sleep' ? room.color : 'rgba(255,255,255,0.4)',
+          transition: 'all 0.3s ease',
+        }}>{room.icon}</span>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontSize: '0.95rem', fontWeight: 700, color: '#fff',
+            fontSize: '0.95rem', fontWeight: 700, 
+            color: roomState !== 'sleep' ? '#fff' : 'rgba(255,255,255,0.6)',
             fontFamily: "'Outfit', sans-serif",
+            transition: 'all 0.3s ease',
           }}>{room.name}</div>
-          <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>
+          <div style={{ 
+            fontSize: '0.65rem', 
+            color: roomState !== 'sleep' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.25)', 
+            letterSpacing: '0.04em',
+            transition: 'all 0.3s ease',
+          }}>
             {room.description}
           </div>
         </div>
         <div style={{
           fontSize: '0.7rem', fontWeight: 700,
           padding: '3px 8px', borderRadius: '10px',
-          backgroundColor: `${room.color}20`,
-          border: `1px solid ${room.color}40`,
-          color: room.color,
+          backgroundColor: roomState !== 'sleep' ? `${room.color}20` : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${roomState !== 'sleep' ? `${room.color}40` : 'rgba(255,255,255,0.06)'}`,
+          color: roomState !== 'sleep' ? room.color : 'rgba(255,255,255,0.3)',
+          transition: 'all 0.3s ease',
         }}>
           {roomUsers.length} 人
         </div>
@@ -204,7 +247,8 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
       <div style={{
         position: 'absolute', top: '52px', left: '14px', right: '14px',
         height: '1px',
-        background: `linear-gradient(90deg, transparent, ${room.color}30, transparent)`,
+        background: wallLineBg,
+        transition: 'all 0.4s ease',
       }} />
 
       {/* Avatars on the floor */}
@@ -214,7 +258,12 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
         flexWrap: 'wrap', gap: '10px', padding: '0 16px',
       }}>
         {roomUsers.length === 0 ? (
-          <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: '0.8rem', fontStyle: 'italic' }}>
+          <span style={{ 
+            color: 'rgba(255,255,255,0.12)', 
+            fontSize: '0.8rem', 
+            fontStyle: 'italic',
+            transition: 'all 0.3s ease',
+          }}>
             空无一人
           </span>
         ) : (
@@ -231,8 +280,8 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
                   backgroundColor: user.color,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '1.4rem',
-                  border: isMe ? '2.5px solid #fff' : `2px solid ${user.color}60`,
-                  boxShadow: `0 4px 14px ${user.color}60`,
+                  border: isMe ? '2.5px solid #fff' : `2.5px solid ${user.color}80`,
+                  boxShadow: isMe ? `0 0 12px #fff, 0 4px 14px ${user.color}60` : `0 4px 14px ${user.color}40`,
                 }}>
                   {user.emoji}
                 </div>
@@ -255,13 +304,19 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
         position: 'absolute', bottom: 0, left: 0, right: 0,
         padding: '8px 14px',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: 'rgba(0,0,0,0.2)',
+        background: 'rgba(0,0,0,0.25)',
         borderTop: '1px solid rgba(255,255,255,0.04)',
       }}>
         {isCurrentUserHere ? (
           <span style={{ fontSize: '0.72rem', color: room.color, fontWeight: 700 }}>● 你正在这里</span>
         ) : (
-          <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>点击移动到这里</span>
+          <span style={{ 
+            fontSize: '0.72rem', 
+            color: canMove ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)',
+            transition: 'all 0.3s ease',
+          }}>
+            {canMove ? '点击移动到这里' : '不可移动'}
+          </span>
         )}
         {roomUsers.length > 0 && (
           <div style={{ display: 'flex', gap: '-4px' }}>

@@ -585,3 +585,104 @@ h1, h2, h3, h4 {
     align-items: start;
   }
 }
+
+/* Mobile Floating Action Button (FAB) */
+.mobile-fab {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(18, 14, 30, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  color: white;
+  font-size: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), 0 0 15px rgba(108, 92, 231, 0.25);
+  z-index: 999;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.mobile-fab:hover {
+  transform: scale(1.08);
+  border-color: var(--color-gaming);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 222, 201, 0.4);
+}
+
+.mobile-fab:active {
+  transform: scale(0.95);
+}
+
+/* Bottom Sheet / Drawer Backdrop Overlay */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.drawer-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Bottom Sheet / Drawer Panel */
+.mobile-drawer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(12, 8, 22, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1.5px solid var(--border-color);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+  z-index: 1001;
+  transform: translateY(105%);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px 20px;
+}
+
+.mobile-drawer.active {
+  transform: translateY(0);
+}
+
+/* Drag handle indicator at top of bottom sheet */
+.drawer-handle {
+  width: 40px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  margin: -10px auto 20px auto;
+}
+
+@media (max-width: 900px) {
+  .app-sidebar.desktop-only {
+    display: none !important;
+  }
+  .mobile-fab {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 901px) {
+  .mobile-drawer, .drawer-overlay, .mobile-fab {
+    display: none !important;
+  }
+}
+

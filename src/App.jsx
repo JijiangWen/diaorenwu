@@ -23,6 +23,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState('connecting');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   const [editEmoji, setEditEmoji] = useState('🎮');
   const [editColor, setEditColor] = useState('#00dec9');
@@ -190,6 +191,7 @@ export default function App() {
       setCurrentUser(updatedUser);
       localStorage.setItem('game_house_user', JSON.stringify(updatedUser));
       setIsEditingProfile(false);
+      setIsMobileDrawerOpen(false);
       fetchUsersSilently();
     } catch (err) {
       setUpdateError(err.message);
@@ -202,6 +204,120 @@ export default function App() {
     setEditCaption(currentUser.caption || '');
     setIsEditingProfile(true);
     setUpdateError('');
+    setIsMobileDrawerOpen(true);
+  };
+
+  const renderSidebar = (extraClass = '') => {
+    return (
+      <aside className={`app-sidebar ${extraClass}`}>
+        {isEditingProfile && (
+          <div className="glass-panel sidebar-card animate-slide-up">
+            <div className="sidebar-card-header">
+              <h3 className="sidebar-card-title">⚙️ 修改个人状态/头像</h3>
+              <button className="close-btn" onClick={() => { setIsEditingProfile(false); setIsMobileDrawerOpen(false); }}>✕</button>
+            </div>
+
+            {updateError && <div className="error-text">⚠️ {updateError}</div>}
+
+            <form onSubmit={handleUpdateProfile}>
+              <div className="input-group">
+                <label className="input-label">我的头像 (Emoji)</label>
+                <div className="avatar-selection-grid">
+                  {EMOJI_OPTIONS.map((emoji) => (
+                    <div
+                      key={emoji}
+                      className={`avatar-selection-item ${editEmoji === emoji ? 'selected' : ''}`}
+                      onClick={() => setEditEmoji(emoji)}
+                    >
+                      {emoji}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">我的发光色</label>
+                <div className="color-selection-grid">
+                  {COLOR_OPTIONS.map((c) => (
+                    <div
+                      key={c.value}
+                      className={`color-selection-item ${editColor === c.value ? 'selected' : ''}`}
+                      style={{ backgroundColor: c.value }}
+                      onClick={() => setEditColor(c.value)}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="input-group" style={{ marginBottom: '20px' }}>
+                <label className="input-label" htmlFor="edit-caption">当前签名</label>
+                <input
+                  className="text-input"
+                  type="text"
+                  id="edit-caption"
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  placeholder="我想说什么..."
+                  maxLength={30}
+                />
+              </div>
+
+              <div className="form-actions">
+                <button className="btn-primary" type="submit" style={{ flex: 2 }}>保存修改</button>
+                <button className="btn-secondary" type="button" onClick={() => { setIsEditingProfile(false); setIsMobileDrawerOpen(false); }} style={{ flex: 1 }}>取消</button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        <div className="glass-panel sidebar-card">
+          <h3 className="sidebar-card-title" style={{ marginBottom: '16px' }}>👥 所有工作伙 / 叼毛 ({users.length})</h3>
+
+          <div className="friends-list">
+            {users.length === 0 ? (
+              <div className="empty-friends">暂无其他注册叼毛</div>
+            ) : (
+              users.map((user) => {
+                const isMe = user.usernameLower === currentUser.username.toLowerCase();
+
+                return (
+                  <div
+                    key={user.usernameLower}
+                    className="friend-row"
+                    style={{
+                      borderLeftColor: user.color,
+                      background: isMe ? 'rgba(255, 255, 255, 0.03)' : 'transparent'
+                    }}
+                  >
+                    <div
+                      className="avatar-circle small"
+                      style={{
+                        backgroundColor: user.color,
+                        boxShadow: `0 2px 8px ${user.color}30`
+                      }}
+                    >
+                      {user.emoji}
+                    </div>
+
+                    <div className="friend-info">
+                      <div className="friend-header-line">
+                        <span className="friend-name">
+                          {user.username} {isMe && <span className="me-tag">(我)</span>}
+                        </span>
+                      </div>
+                      <p className="friend-caption" title={user.caption}>
+                        {user.caption || '这人很懒，什么都没写~'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </aside>
+    );
   };
 
   if (!currentUser) {
@@ -284,115 +400,30 @@ export default function App() {
           )}
         </section>
 
-        <aside className="app-sidebar">
-          {isEditingProfile && (
-            <div className="glass-panel sidebar-card animate-slide-up">
-              <div className="sidebar-card-header">
-                <h3 className="sidebar-card-title">⚙️ 修改个人状态/头像</h3>
-                <button className="close-btn" onClick={() => setIsEditingProfile(false)}>✕</button>
-              </div>
-
-              {updateError && <div className="error-text">⚠️ {updateError}</div>}
-
-              <form onSubmit={handleUpdateProfile}>
-                <div className="input-group">
-                  <label className="input-label">我的头像 (Emoji)</label>
-                  <div className="avatar-selection-grid">
-                    {EMOJI_OPTIONS.map((emoji) => (
-                      <div
-                        key={emoji}
-                        className={`avatar-selection-item ${editEmoji === emoji ? 'selected' : ''}`}
-                        onClick={() => setEditEmoji(emoji)}
-                      >
-                        {emoji}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="input-group">
-                  <label className="input-label">我的发光色</label>
-                  <div className="color-selection-grid">
-                    {COLOR_OPTIONS.map((c) => (
-                      <div
-                        key={c.value}
-                        className={`color-selection-item ${editColor === c.value ? 'selected' : ''}`}
-                        style={{ backgroundColor: c.value }}
-                        onClick={() => setEditColor(c.value)}
-                        title={c.name}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="input-group" style={{ marginBottom: '20px' }}>
-                  <label className="input-label" htmlFor="edit-caption">当前签名</label>
-                  <input
-                    className="text-input"
-                    type="text"
-                    id="edit-caption"
-                    value={editCaption}
-                    onChange={(e) => setEditCaption(e.target.value)}
-                    placeholder="我想说什么..."
-                    maxLength={30}
-                  />
-                </div>
-
-                <div className="form-actions">
-                  <button className="btn-primary" type="submit" style={{ flex: 2 }}>保存修改</button>
-                  <button className="btn-secondary" type="button" onClick={() => setIsEditingProfile(false)} style={{ flex: 1 }}>取消</button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          <div className="glass-panel sidebar-card">
-            <h3 className="sidebar-card-title" style={{ marginBottom: '16px' }}>👥 所有叼毛 ({users.length})</h3>
-
-            <div className="friends-list">
-              {users.length === 0 ? (
-                <div className="empty-friends">暂无其他注册叼毛</div>
-              ) : (
-                users.map((user) => {
-                  const isMe = user.usernameLower === currentUser.username.toLowerCase();
-
-                  return (
-                    <div
-                      key={user.usernameLower}
-                      className="friend-row"
-                      style={{
-                        borderLeftColor: user.color,
-                        background: isMe ? 'rgba(255, 255, 255, 0.03)' : 'transparent'
-                      }}
-                    >
-                      <div
-                        className="avatar-circle small"
-                        style={{
-                          backgroundColor: user.color,
-                          boxShadow: `0 2px 8px ${user.color}30`
-                        }}
-                      >
-                        {user.emoji}
-                      </div>
-
-                      <div className="friend-info">
-                        <div className="friend-header-line">
-                          <span className="friend-name">
-                            {user.username} {isMe && <span className="me-tag">(我)</span>}
-                          </span>
-                        </div>
-                        <p className="friend-caption" title={user.caption}>
-                          {user.caption || '这人很懒，什么都没写~'}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </aside>
+        {/* Desktop Sidebar (Only visible on screens > 900px) */}
+        {renderSidebar("desktop-only")}
       </main>
+
+      {/* Mobile Floating Action Button (FAB) for Friends Sheet */}
+      <button
+        className="mobile-fab animate-float"
+        onClick={() => setIsMobileDrawerOpen(true)}
+        title="查看所有工作伙 / 叼毛"
+      >
+        👥
+      </button>
+
+      {/* Mobile Drawer Backdrop Overlay */}
+      <div
+        className={`drawer-overlay ${isMobileDrawerOpen ? 'active' : ''}`}
+        onClick={() => setIsMobileDrawerOpen(false)}
+      />
+
+      {/* Mobile Drawer Bottom Sheet */}
+      <div className={`mobile-drawer ${isMobileDrawerOpen ? 'active' : ''}`}>
+        <div className="drawer-handle" onClick={() => setIsMobileDrawerOpen(false)} />
+        {renderSidebar()}
+      </div>
     </div>
   );
 }
