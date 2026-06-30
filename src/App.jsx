@@ -31,6 +31,9 @@ export default function App() {
   const [updateError, setUpdateError] = useState('');
 
   const pollingRef = useRef(null);
+  const committedStatusRef = useRef('gaming');
+  const debounceTimerRef = useRef(null);
+  const isMovingRef = useRef(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('game_house_user');
@@ -38,6 +41,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(savedUser);
         setCurrentUser(parsed);
+        committedStatusRef.current = parsed.status || 'gaming';
         fetchUsers();
       } catch (e) {
         localStorage.removeItem('game_house_user');
@@ -87,10 +91,24 @@ export default function App() {
     try {
       const res = await fetch('/api/users');
       if (res.ok) {
-        const data = await res.json();
+        let data = await res.json();
+        
+        // If moving, override DB status for ourselves to preserve the optimistic state in HouseMap
+        if (isMovingRef.current && currentUser) {
+          data = data.map(u => 
+            u.usernameLower === currentUser.username.toLowerCase()
+              ? { ...u, status: currentUser.status }
+              : u
+          );
+        }
+        
         setUsers(data);
         setSyncStatus('synced');
-        updateCurrentUserFromSync(data);
+        
+        // Skip syncing currentUser state from DB while actively switching rooms
+        if (!isMovingRef.current) {
+          updateCurrentUserFromSync(data);
+        }
       } else {
         setSyncStatus('error');
       }
@@ -120,6 +138,7 @@ export default function App() {
 
   const handleAuthSuccess = (userData) => {
     setCurrentUser(userData);
+    committedStatusRef.current = userData.status || 'gaming';
     setEditEmoji(userData.emoji || '🎮');
     setEditColor(userData.color || '#00dec9');
     setEditCaption(userData.caption || '准备开黑！');
@@ -130,56 +149,68 @@ export default function App() {
     setCurrentUser(null);
   };
 
-  const handleMoveRoom = async (newStatus) => {
+  const handleMoveRoom = (newStatus) => {
     if (!currentUser) return;
-    
-    const oldStatus = currentUser.status;
-    
+
     // 1. Optimistic Update: Immediately update UI local state
     setCurrentUser(prev => ({ ...prev, status: newStatus }));
-    setUsers(prevUsers => prevUsers.map(u => 
-      u.usernameLower === currentUser.username.toLowerCase() 
-        ? { ...u, status: newStatus } 
+    setUsers(prevUsers => prevUsers.map(u =>
+      u.usernameLower === currentUser.username.toLowerCase()
+        ? { ...u, status: newStatus }
         : u
     ));
-    
-    setSyncStatus('connecting');
-    try {
-      const res = await fetch('/api/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: currentUser.username,
-          token: currentUser.token,
-          status: newStatus
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 403) {
-          handleLogout();
-          alert('登录超时，请重新登录');
-        } else {
-          throw new Error(data.error || '移动失败');
-        }
-        return;
-      }
-      
-      // Success: Fetch latest lists silently (in case other users moved)
-      fetchUsersSilently();
-    } catch (err) {
-      console.error(err);
-      
-      // 2. Rollback if API request fails
-      setCurrentUser(prev => ({ ...prev, status: oldStatus }));
-      setUsers(prevUsers => prevUsers.map(u => 
-        u.usernameLower === currentUser.username.toLowerCase() 
-          ? { ...u, status: oldStatus } 
-          : u
-      ));
-      
-      alert(err.message || '网络连接异常，请重试');
+
+    isMovingRef.current = true;
+
+    // Clear previous debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
+
+    // Set new debounce timer to batch fast consecutive updates
+    debounceTimerRef.current = setTimeout(async () => {
+      setSyncStatus('connecting');
+      try {
+        const res = await fetch('/api/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: currentUser.username,
+            token: currentUser.token,
+            status: newStatus
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (res.status === 403) {
+            handleLogout();
+            alert('登录超时，请重新登录');
+          } else {
+            throw new Error(data.error || '移动失败');
+          }
+          return;
+        }
+
+        // Successfully updated status on server
+        committedStatusRef.current = newStatus;
+        isMovingRef.current = false;
+        fetchUsersSilently();
+      } catch (err) {
+        console.error(err);
+        isMovingRef.current = false;
+
+        // Rollback if request fails
+        const rollbackStatus = committedStatusRef.current;
+        setCurrentUser(prev => ({ ...prev, status: rollbackStatus }));
+        setUsers(prevUsers => prevUsers.map(u =>
+          u.usernameLower === currentUser.username.toLowerCase()
+            ? { ...u, status: rollbackStatus }
+            : u
+        ));
+
+        alert(err.message || '网络连接异常，请重试');
+      }
+    }, 250); // 250ms debounce window
   };
 
   const handleUpdateProfile = async (e) => {
@@ -288,55 +319,88 @@ export default function App() {
                 <button className="btn-primary" type="submit" style={{ flex: 2 }}>保存修改</button>
                 <button className="btn-secondary" type="button" onClick={() => { setIsEditingProfile(false); setIsMobileDrawerOpen(false); }} style={{ flex: 1 }}>取消</button>
               </div>
+
+              <div style={{
+                marginTop: '20px',
+                paddingTop: '16px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+              }}>
+                <button
+                  className="btn-secondary logout-btn"
+                  type="button"
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileDrawerOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    color: '#ff7675',
+                    borderColor: 'rgba(255, 118, 117, 0.15)',
+                    background: 'rgba(255, 118, 117, 0.02)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '0.85rem',
+                    height: '38px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  🚪 退出当前登录
+                </button>
+              </div>
             </form>
           </div>
         )}
 
-        <div className="glass-panel sidebar-card">
-          <h3 className="sidebar-card-title" style={{ marginBottom: '16px' }}>👥 所有叼毛 ({users.length})</h3>
+        {(!isEditingProfile || extraClass === 'desktop-only') && (
+          <div className="glass-panel sidebar-card">
+            <h3 className="sidebar-card-title" style={{ marginBottom: '16px' }}>👥 所有叼毛 ({users.length})</h3>
 
-          <div className="friends-list">
-            {users.length === 0 ? (
-              <div className="empty-friends">暂无其他注册叼毛</div>
-            ) : (
-              users.map((user) => {
-                const isMe = user.usernameLower === currentUser.username.toLowerCase();
+            <div className="friends-list">
+              {users.length === 0 ? (
+                <div className="empty-friends">暂无其他注册叼毛</div>
+              ) : (
+                users.map((user) => {
+                  const isMe = user.usernameLower === currentUser.username.toLowerCase();
 
-                return (
-                  <div
-                    key={user.usernameLower}
-                    className="friend-row"
-                    style={{
-                      borderLeftColor: user.color,
-                      background: isMe ? 'rgba(255, 255, 255, 0.03)' : 'transparent'
-                    }}
-                  >
+                  return (
                     <div
-                      className="avatar-circle small"
+                      key={user.usernameLower}
+                      className="friend-row"
                       style={{
-                        backgroundColor: user.color,
-                        boxShadow: `0 2px 8px ${user.color}30`
+                        borderLeftColor: user.color,
+                        background: isMe ? 'rgba(255, 255, 255, 0.03)' : 'transparent'
                       }}
                     >
-                      {user.emoji}
-                    </div>
-
-                    <div className="friend-info">
-                      <div className="friend-header-line">
-                        <span className="friend-name">
-                          {user.username} {isMe && <span className="me-tag">(我)</span>}
-                        </span>
+                      <div
+                        className="avatar-circle small"
+                        style={{
+                          backgroundColor: user.color,
+                          boxShadow: `0 2px 8px ${user.color}30`
+                        }}
+                      >
+                        {user.emoji}
                       </div>
-                      <p className="friend-caption" title={user.caption}>
-                        {user.caption || '这人很懒，什么都没写~'}
-                      </p>
+
+                      <div className="friend-info">
+                        <div className="friend-header-line">
+                          <span className="friend-name">
+                            {user.username} {isMe && <span className="me-tag">(我)</span>}
+                          </span>
+                        </div>
+                        <p className="friend-caption" title={user.caption}>
+                          {user.caption || '这人很懒，什么都没写~'}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </aside>
     );
   };
@@ -393,8 +457,7 @@ export default function App() {
             <span className="user-status">点击修改状态</span>
           </div>
           <div className="user-actions">
-            <button className="btn-icon" onClick={startEditProfile} title="修改个人信息">⚙️</button>
-            <button className="btn-icon logout-btn" onClick={handleLogout} title="退出登录">🚪</button>
+            <button className="btn-icon" onClick={startEditProfile} title="修改个人状态与头像">⚙️</button>
           </div>
         </div>
       </header>
@@ -428,7 +491,10 @@ export default function App() {
       {/* Mobile Floating Action Button (FAB) for Friends Sheet */}
       <button
         className="mobile-fab animate-float"
-        onClick={() => setIsMobileDrawerOpen(true)}
+        onClick={() => {
+          setIsEditingProfile(false);
+          setIsMobileDrawerOpen(true);
+        }}
         title="查看所有叼毛"
       >
         👥
