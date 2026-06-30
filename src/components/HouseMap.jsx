@@ -73,7 +73,7 @@ const ROOMS = [
   },
   {
     id: 'baby',
-    name: '叼人婴儿房',
+    name: '狗猴婴儿房',
     icon: '🍼',
     color: '#fd79a8',
     description: '照顾女儿/带娃中',
@@ -90,7 +90,7 @@ const ROOMS = [
     name: '回家路上',
     icon: '🚃',
     color: '#f1c40f',
-    description: '坐电车/地铁回家中',
+    description: '坐电车/开车回家中',
     furniture: [
       { emoji: '🚃', top: '35%', left: '20%', size: '2.2rem' },
       { emoji: '🚉', top: '15%', left: '70%', size: '1.6rem' },
@@ -104,11 +104,11 @@ const ROOMS = [
     name: '叼人阳台',
     icon: '🪴',
     color: '#2ecc71',
-    description: '健身/出门/不在',
+    description: '健身/出门/打球',
     furniture: [
       { emoji: '🪴', top: '15%', left: '10%', size: '1.8rem' },
       { emoji: '🏋️', top: '50%', left: '55%', size: '2rem' },
-      { emoji: '☀️', top: '10%', left: '70%', size: '1.6rem' },
+      { emoji: '🏀', top: '10%', left: '70%', size: '1.6rem' },
     ],
     ambientLines: ['rgba(46,204,113,0.07)', 'rgba(0,222,201,0.1)'],
     gridArea: 'balcony',
