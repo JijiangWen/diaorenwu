@@ -132,6 +132,17 @@ export default function App() {
 
   const handleMoveRoom = async (newStatus) => {
     if (!currentUser) return;
+    
+    const oldStatus = currentUser.status;
+    
+    // 1. Optimistic Update: Immediately update UI local state
+    setCurrentUser(prev => ({ ...prev, status: newStatus }));
+    setUsers(prevUsers => prevUsers.map(u => 
+      u.usernameLower === currentUser.username.toLowerCase() 
+        ? { ...u, status: newStatus } 
+        : u
+    ));
+    
     setSyncStatus('connecting');
     try {
       const res = await fetch('/api/status', {
@@ -153,10 +164,20 @@ export default function App() {
         }
         return;
       }
-      setCurrentUser(prev => ({ ...prev, status: newStatus }));
+      
+      // Success: Fetch latest lists silently (in case other users moved)
       fetchUsersSilently();
     } catch (err) {
       console.error(err);
+      
+      // 2. Rollback if API request fails
+      setCurrentUser(prev => ({ ...prev, status: oldStatus }));
+      setUsers(prevUsers => prevUsers.map(u => 
+        u.usernameLower === currentUser.username.toLowerCase() 
+          ? { ...u, status: oldStatus } 
+          : u
+      ));
+      
       alert(err.message || '网络连接异常，请重试');
     }
   };
@@ -272,7 +293,7 @@ export default function App() {
         )}
 
         <div className="glass-panel sidebar-card">
-          <h3 className="sidebar-card-title" style={{ marginBottom: '16px' }}>👥 所有工作伙 / 叼毛 ({users.length})</h3>
+          <h3 className="sidebar-card-title" style={{ marginBottom: '16px' }}>👥 所有叼毛 ({users.length})</h3>
 
           <div className="friends-list">
             {users.length === 0 ? (
@@ -408,7 +429,7 @@ export default function App() {
       <button
         className="mobile-fab animate-float"
         onClick={() => setIsMobileDrawerOpen(true)}
-        title="查看所有工作伙 / 叼毛"
+        title="查看所有叼毛"
       >
         👥
       </button>
