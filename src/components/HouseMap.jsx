@@ -72,6 +72,34 @@ const ROOMS = [
     gridArea: 'bedroom',
   },
   {
+    id: 'baby',
+    name: '叼人婴儿房',
+    icon: '🍼',
+    color: '#fd79a8',
+    description: '照顾女儿/带娃中',
+    furniture: [
+      { emoji: '🍼', top: '20%', left: '15%', size: '1.8rem' },
+      { emoji: '🧸', top: '55%', left: '55%', size: '2.0rem' },
+      { emoji: '🎠', top: '15%', left: '70%', size: '1.6rem' },
+    ],
+    ambientLines: ['rgba(253,121,168,0.07)', 'rgba(255,94,151,0.1)'],
+    gridArea: 'nursery',
+  },
+  {
+    id: 'commuting',
+    name: '回家路上',
+    icon: '🚃',
+    color: '#f1c40f',
+    description: '坐电车/地铁回家中',
+    furniture: [
+      { emoji: '🚃', top: '35%', left: '20%', size: '2.2rem' },
+      { emoji: '🚉', top: '15%', left: '70%', size: '1.6rem' },
+      { emoji: '🛣️', top: '65%', left: '60%', size: '1.4rem' },
+    ],
+    ambientLines: ['rgba(241,196,15,0.07)', 'rgba(255,159,67,0.1)'],
+    gridArea: 'metro',
+  },
+  {
     id: 'out',
     name: '叼人阳台',
     icon: '🪴',
@@ -354,11 +382,11 @@ function DesktopHouseView({ rooms, users, currentUser, onMoveRoom }) {
     <div style={{
       display: 'grid',
       gridTemplateColumns: '1fr 1fr 1fr',
-      gridTemplateRows: 'auto auto',
+      gridTemplateRows: 'auto auto auto',
       gridTemplateAreas: `
         "living living kitchen"
-        "bedroom study bath"
-        "balcony study out_pad"
+        "bedroom nursery bath"
+        "metro study balcony"
       `,
       gap: '14px',
     }}>

@@ -169,7 +169,7 @@ app.post('/api/status', async (req, res) => {
 
   const cleanUsername = username.trim().toLowerCase();
 
-  const allowedRooms = ['gaming', 'eating', 'showering', 'working', 'sleeping', 'out'];
+  const allowedRooms = ['gaming', 'eating', 'showering', 'working', 'sleeping', 'out', 'commuting', 'baby'];
   if (!allowedRooms.includes(status)) {
     return res.status(400).json({ error: '无效的状态区域' });
   }
