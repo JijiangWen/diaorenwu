@@ -444,26 +444,7 @@ export default function App() {
 
         {(!isEditingProfile || extraClass === 'desktop-only') && (
           <div className="glass-panel sidebar-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 className="sidebar-card-title" style={{ margin: 0 }}>👥 所有叼毛 ({users.length})</h3>
-              {extraClass !== 'desktop-only' && (
-                <button 
-                  className="close-btn" 
-                  onClick={() => setIsMobileDrawerOpen(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'rgba(255, 255, 255, 0.4)',
-                    fontSize: '1.25rem',
-                    cursor: 'pointer',
-                    padding: '0 4px',
-                    lineHeight: 1,
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+            <h3 className="sidebar-card-title" style={{ marginBottom: '16px' }}>👥 所有叼毛 ({users.length})</h3>
 
             <div className="friends-list">
               {users.length === 0 ? (
