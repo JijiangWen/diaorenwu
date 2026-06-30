@@ -1,5 +1,61 @@
 import React, { useState } from 'react';
 
+function formatDuration(lastActive) {
+  if (!lastActive) return '刚刚';
+  const parsedTime = typeof lastActive === 'number' ? lastActive : new Date(lastActive).getTime();
+  if (isNaN(parsedTime)) return '刚刚';
+  
+  const diffMs = Math.max(0, Date.now() - parsedTime);
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return '刚刚';
+  if (diffMins < 60) return `${diffMins}分钟`;
+  
+  const hours = Math.floor(diffMins / 60);
+  const remainingMins = diffMins % 60;
+  
+  if (hours < 24) {
+    if (remainingMins === 0) return `${hours}小时`;
+    return `${hours}h ${remainingMins}m`;
+  }
+  
+  const days = Math.floor(hours / 24);
+  return `${days}天前`;
+}
+
+function getHoverTooltip(username, status, lastActive) {
+  const roomNames = {
+    gaming: '客厅',
+    eating: '厨房',
+    showering: '浴室',
+    working: '书房',
+    sleeping: '卧室',
+    baby: '婴儿房',
+    commuting: '回家路上',
+    out: '阳台',
+  };
+  
+  const actions = {
+    gaming: '在客厅开黑',
+    eating: '在厨房干饭',
+    showering: '在浴室洗澡',
+    working: '在书房搬砖',
+    sleeping: '在卧室梦游',
+    baby: '在带娃喂奶',
+    commuting: '在回家路上',
+    out: '在阳台放空',
+  };
+
+  const roomName = roomNames[status] || '房间';
+  const action = actions[status] || '挂机';
+  const duration = formatDuration(lastActive);
+
+  if (duration === '刚刚') {
+    return `${username} 刚刚进入${roomName}`;
+  }
+  return `${username} 已${action} ${duration}`;
+}
+
 const ROOMS = [
   {
     id: 'gaming',
@@ -270,11 +326,15 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
           roomUsers.map((user) => {
             const isMe = currentUser && user.usernameLower === currentUser.username?.toLowerCase();
             return (
-              <div key={user.usernameLower} style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                animation: 'token-float 4s ease-in-out infinite',
-                animationDelay: `${(user.usernameLower.charCodeAt(0) % 10) * 0.3}s`,
-              }}>
+              <div 
+                key={user.usernameLower} 
+                title={getHoverTooltip(isMe ? '我' : user.username, user.status || room.id, user.lastActive)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                  animation: 'token-float 4s ease-in-out infinite',
+                  animationDelay: `${(user.usernameLower.charCodeAt(0) % 10) * 0.3}s`,
+                }}
+              >
                 <div style={{
                   width: '42px', height: '42px', borderRadius: '50%',
                   backgroundColor: user.color,
@@ -292,6 +352,17 @@ function RoomCard({ room, roomUsers, isCurrentUserHere, currentUser, onMoveRoom,
                   maxWidth: '70px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {isMe ? '👈 我' : user.username}
+                </span>
+                <span style={{
+                  fontSize: '0.52rem',
+                  color: 'rgba(255, 255, 255, 0.65)',
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  padding: '1px 4px',
+                  borderRadius: '4px',
+                  whiteSpace: 'nowrap',
+                  border: '1px solid rgba(255, 255, 255, 0.04)',
+                }}>
+                  ⏱️ {formatDuration(user.lastActive)}
                 </span>
               </div>
             );

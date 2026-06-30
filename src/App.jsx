@@ -17,6 +17,74 @@ const COLOR_OPTIONS = [
   { name: '极客绿', value: '#2ecc71' }
 ];
 
+function formatDurationShort(lastActive) {
+  if (!lastActive) return '刚刚';
+  const parsedTime = typeof lastActive === 'number' ? lastActive : new Date(lastActive).getTime();
+  if (isNaN(parsedTime)) return '刚刚';
+
+  const diffMs = Math.max(0, Date.now() - parsedTime);
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return '刚刚';
+  if (diffMins < 60) return `${diffMins}分钟`;
+
+  const hours = Math.floor(diffMins / 60);
+  const remainingMins = diffMins % 60;
+
+  if (hours < 24) {
+    if (remainingMins === 0) return `${hours}小时`;
+    return `${hours}h ${remainingMins}m`;
+  }
+
+  const days = Math.floor(hours / 24);
+  return `${days}天前`;
+}
+
+function getStatusDurationText(status, lastActive) {
+  const roomNames = {
+    gaming: '客厅',
+    eating: '厨房',
+    showering: '浴室',
+    working: '书房',
+    sleeping: '卧室',
+    baby: '婴儿房',
+    commuting: '回家路上',
+    out: '阳台',
+  };
+
+  const actions = {
+    gaming: '在客厅开黑',
+    eating: '在厨房干饭',
+    showering: '在浴室洗澡',
+    working: '在书房搬砖',
+    sleeping: '在卧室梦游',
+    baby: '在带娃照顾女儿',
+    commuting: '在回家路上',
+    out: '在外放风',
+  };
+
+  const icons = {
+    gaming: '🎮',
+    eating: '🍳',
+    showering: '🛁',
+    working: '💻',
+    sleeping: '🛌',
+    baby: '🍼',
+    commuting: '🚃',
+    out: '🪴',
+  };
+
+  const roomName = roomNames[status] || '房间';
+  const action = actions[status] || '挂机';
+  const icon = icons[status] || '🏠';
+  const duration = formatDurationShort(lastActive);
+
+  if (duration === '刚刚') {
+    return `刚进入${roomName} ${icon}`;
+  }
+  return `已${action} ${duration} ${icon}`;
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
@@ -34,6 +102,26 @@ export default function App() {
   const committedStatusRef = useRef('gaming');
   const debounceTimerRef = useRef(null);
   const isMovingRef = useRef(false);
+
+  const touchStartY = useRef(0);
+  const touchCurrentY = useRef(0);
+
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e) => {
+    touchCurrentY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = () => {
+    const swipeDistance = touchCurrentY.current - touchStartY.current;
+    if (swipeDistance > 60 && touchCurrentY.current !== 0) {
+      setIsMobileDrawerOpen(false);
+    }
+    touchStartY.current = 0;
+    touchCurrentY.current = 0;
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('game_house_user');
@@ -92,19 +180,19 @@ export default function App() {
       const res = await fetch('/api/users');
       if (res.ok) {
         let data = await res.json();
-        
+
         // If moving, override DB status for ourselves to preserve the optimistic state in HouseMap
         if (isMovingRef.current && currentUser) {
-          data = data.map(u => 
+          data = data.map(u =>
             u.usernameLower === currentUser.username.toLowerCase()
               ? { ...u, status: currentUser.status }
               : u
           );
         }
-        
+
         setUsers(data);
         setSyncStatus('synced');
-        
+
         // Skip syncing currentUser state from DB while actively switching rooms
         if (!isMovingRef.current) {
           updateCurrentUserFromSync(data);
@@ -356,7 +444,26 @@ export default function App() {
 
         {(!isEditingProfile || extraClass === 'desktop-only') && (
           <div className="glass-panel sidebar-card">
-            <h3 className="sidebar-card-title" style={{ marginBottom: '16px' }}>👥 所有叼毛 ({users.length})</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 className="sidebar-card-title" style={{ margin: 0 }}>👥 所有叼毛 ({users.length})</h3>
+              {extraClass !== 'desktop-only' && (
+                <button 
+                  className="close-btn" 
+                  onClick={() => setIsMobileDrawerOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
             <div className="friends-list">
               {users.length === 0 ? (
@@ -389,6 +496,15 @@ export default function App() {
                           <span className="friend-name">
                             {user.username} {isMe && <span className="me-tag">(我)</span>}
                           </span>
+                        </div>
+                        <div style={{
+                          fontSize: '0.72rem',
+                          color: user.color,
+                          opacity: 0.85,
+                          margin: '2px 0 4px 0',
+                          fontWeight: 500
+                        }}>
+                          {getStatusDurationText(user.status, user.lastActive)}
                         </div>
                         <p className="friend-caption" title={user.caption}>
                           {user.caption || '这人很懒，什么都没写~'}
@@ -506,9 +622,14 @@ export default function App() {
         onClick={() => setIsMobileDrawerOpen(false)}
       />
 
-      {/* Mobile Drawer Bottom Sheet */}
       <div className={`mobile-drawer ${isMobileDrawerOpen ? 'active' : ''}`}>
-        <div className="drawer-handle" onClick={() => setIsMobileDrawerOpen(false)} />
+        <div 
+          className="drawer-handle" 
+          onClick={() => setIsMobileDrawerOpen(false)}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        />
         {renderSidebar()}
       </div>
     </div>
