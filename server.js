@@ -55,7 +55,7 @@ const userSchema = new mongoose.Schema({
   color: { type: String, default: '#6c5ce7' },
   status: { type: String, default: 'gaming' },
   caption: { type: String, default: '准备开黑！' },
-  lastActive: { type: Number, default: Date.now }
+  lastActive: { type: Number, default: Date.now, index: true }
 });
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
@@ -148,11 +148,26 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 3. Get All Users (with active states)
+// 3. Get All Users (with active states and optional timestamp filtering)
 app.get('/api/users', async (req, res) => {
   try {
+    const since = req.query.since ? parseInt(req.query.since, 10) : 0;
+
+    // Find the latest active timestamp among all users
+    const latestUser = await User.findOne({}, 'lastActive').sort({ lastActive: -1 });
+    const latestActive = latestUser ? latestUser.lastActive : 0;
+
+    // If client is already up-to-date, return unmodified status
+    if (since && latestActive <= since) {
+      return res.json({ modified: false });
+    }
+
     const usersList = await User.find({}, '-passwordHash -salt -token');
-    res.json(usersList);
+    res.json({
+      modified: true,
+      users: usersList,
+      syncTime: latestActive
+    });
   } catch (err) {
     console.error('Get users error:', err);
     res.status(500).json({ error: '获取用户列表失败' });

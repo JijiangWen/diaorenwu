@@ -99,6 +99,7 @@ export default function App() {
   const [updateError, setUpdateError] = useState('');
 
   const pollingRef = useRef(null);
+  const lastSyncTimeRef = useRef(0);
   const committedStatusRef = useRef('gaming');
   const debounceTimerRef = useRef(null);
   const isMovingRef = useRef(false);
@@ -130,8 +131,7 @@ export default function App() {
         const parsed = JSON.parse(savedUser);
         setCurrentUser(parsed);
         committedStatusRef.current = parsed.status || 'gaming';
-        fetchUsers();
-      } catch (e) {
+      } catch {
         localStorage.removeItem('game_house_user');
         setLoading(false);
       }
@@ -140,33 +140,19 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchUsers();
-      if (pollingRef.current) clearInterval(pollingRef.current);
-      pollingRef.current = setInterval(() => fetchUsersSilently(), 3000);
-    } else {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-      setUsers([]);
-    }
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [currentUser ? currentUser.username : null]);
-
   const fetchUsers = async () => {
     setLoading(true);
     setSyncStatus('connecting');
     try {
-      const res = await fetch('/api/users');
+      const res = await fetch('/api/users?since=0');
       if (!res.ok) throw new Error('同步失败');
       const data = await res.json();
-      setUsers(data);
+      if (data.modified) {
+        setUsers(data.users);
+        lastSyncTimeRef.current = data.syncTime;
+        updateCurrentUserFromSync(data.users);
+      }
       setSyncStatus('synced');
-      updateCurrentUserFromSync(data);
     } catch (err) {
       console.error(err);
       setSyncStatus('error');
@@ -177,37 +163,98 @@ export default function App() {
 
   const fetchUsersSilently = async () => {
     try {
-      const res = await fetch('/api/users');
+      const res = await fetch(`/api/users?since=${lastSyncTimeRef.current}`);
       if (res.ok) {
-        let data = await res.json();
+        const data = await res.json();
 
-        // If moving, override DB status for ourselves to preserve the optimistic state in HouseMap
-        if (isMovingRef.current && currentUser) {
-          data = data.map(u =>
-            u.usernameLower === currentUser.username.toLowerCase()
-              ? { ...u, status: currentUser.status }
-              : u
-          );
+        if (data.modified) {
+          let updatedUsers = data.users;
+
+          // If moving, override DB status for ourselves to preserve the optimistic state in HouseMap
+          if (isMovingRef.current && currentUser) {
+            updatedUsers = updatedUsers.map(u =>
+              u.usernameLower === currentUser.username.toLowerCase()
+                ? { ...u, status: currentUser.status }
+                : u
+            );
+          }
+
+          setUsers(updatedUsers);
+          lastSyncTimeRef.current = data.syncTime;
+
+          // Skip syncing currentUser state from DB while actively switching rooms
+          if (!isMovingRef.current) {
+            updateCurrentUserFromSync(updatedUsers);
+          }
         }
-
-        setUsers(data);
         setSyncStatus('synced');
-
-        // Skip syncing currentUser state from DB while actively switching rooms
-        if (!isMovingRef.current) {
-          updateCurrentUserFromSync(data);
-        }
       } else {
         setSyncStatus('error');
       }
     } catch (err) {
+      console.error(err);
       setSyncStatus('error');
     }
   };
 
-  const updateCurrentUserFromSync = (data) => {
+  const currentUsername = currentUser ? currentUser.username : null;
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchUsers();
+
+      const startPolling = () => {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = setInterval(() => fetchUsersSilently(), 15000);
+      };
+
+      const stopPolling = () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          stopPolling();
+        } else {
+          fetchUsersSilently();
+          startPolling();
+        }
+      };
+
+      startPolling();
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      return () => {
+        stopPolling();
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    } else {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      setUsers([]);
+      lastSyncTimeRef.current = 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUsername]);
+
+  const handleManualSync = () => {
+    fetchUsersSilently();
+    if (currentUser && !document.hidden) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = setInterval(() => fetchUsersSilently(), 15000);
+      }
+    }
+  };
+
+  const updateCurrentUserFromSync = (usersList) => {
     if (!currentUser) return;
-    const myLatestInfo = data.find(u => u.usernameLower === currentUser.username.toLowerCase());
+    const myLatestInfo = usersList.find(u => u.usernameLower === currentUser.username.toLowerCase());
     if (myLatestInfo && (
       myLatestInfo.status !== currentUser.status ||
       myLatestInfo.emoji !== currentUser.emoji ||
@@ -534,7 +581,7 @@ export default function App() {
           <span className="sync-text">
             {syncStatus === 'synced' ? '已实时同步' : syncStatus === 'connecting' ? '同步中...' : '连接失败'}
           </span>
-          <button className="sync-btn" onClick={fetchUsersSilently} title="手动同步">🔄</button>
+          <button className="sync-btn" onClick={handleManualSync} title="手动同步">🔄</button>
         </div>
 
         <div className="user-profile">
